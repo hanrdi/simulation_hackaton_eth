@@ -9,7 +9,7 @@ import numpy as np
 
 import os
 
-seed = 0
+seed = 1
 # data_path = "./data/output_seed1/"
 data_path = "./output_seed" + str(seed) + "/"
 format_output_path = "./formatted_data" + str(seed) + "/"
@@ -76,7 +76,9 @@ def eval_function(function, num_x=100, num_y=100):
 
     out = [function.at(p.tolist()) for p in points]
 
-    f_at_points = np.reshape(out, (num_x, num_y))
+    target_shape = (num_x, num_y) if out[0].shape == () else (num_x, num_y, 2)
+
+    f_at_points = np.reshape(out, target_shape)
 
     return points, f_at_points
 
@@ -100,16 +102,7 @@ def main():
     filenames.sort(key=os.path.getctime)
 
     for file_name in filenames:
-        num = int(file_name[len(data_path) + len("results-") :].split(".")[0])
-
-        # if num < 22:
-        #     continue
-
-        # if num > 22:
-        #     break
-
-        # if num % 20 != 19:
-        #     continue
+        # num = int(file_name[len(data_path) + len("results-") :].split(".")[0])
 
         print(file_name)
 
@@ -118,10 +111,7 @@ def main():
 
             function_names = ["rho", "rhof"]
             composite_functions = {
-                "up": {
-                    # "vel": 0,
-                    "press": 1
-                },
+                "up": {"vel": 0, "press": 1},
                 "t_total": {"channel_t": 0, "substrate_t": 1},
             }
 
@@ -150,29 +140,39 @@ def main():
 
             for cf_name, cf in composite_functions.items():
                 for sf_name, subfunc in cf.items():
-                    # print("Cf:", cf_name, "/", cf)
-                    # print("sf", subfunc)
                     func = afile.load_function(mesh, cf_name).sub(subfunc)
                     x, y = eval_function(func)
 
-                    filename = (
-                        format_output_path
-                        + file_name[len(data_path) :]
-                        + "_"
-                        + sf_name
-                        + ".out"
-                    )
-                    print("Saving", filename)
-                    np.savetxt(filename, y)
+                    # Introduce dim to handle vector valued fields like velocity
+                    dim_quant = 1 if len(y.shape) == 2 else y.shape[-1]
+                    for dim in range(dim_quant):
 
-                    plot(y, title=sf_name)
-                    plt.savefig(
-                        format_output_path
-                        + file_name[len(data_path) :]
-                        + "_"
-                        + sf_name
-                        + ".png"
-                    )
+                        filename = (
+                            format_output_path
+                            + file_name[len(data_path) :]
+                            + "_"
+                            + sf_name
+                            + "_"
+                            + str(dim)
+                            + ".out"
+                        )
+
+                        arr = y if dim_quant == 1 else y[:, :, dim]
+                        np.savetxt(filename, arr)
+
+                        plot(
+                            arr,
+                            title=sf_name + str(dim),
+                        )
+                        plt.savefig(
+                            format_output_path
+                            + file_name[len(data_path) :]
+                            + "_"
+                            + sf_name
+                            + "_"
+                            + str(dim)
+                            + ".png"
+                        )
 
 
 if __name__ == "__main__":
