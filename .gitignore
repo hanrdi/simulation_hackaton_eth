@@ -2,3 +2,4 @@ data/
 venv/
 output/
 __pycache__/
+output_seed*

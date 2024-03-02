@@ -19,8 +19,8 @@ from helpers import (
 from pyMMAopt import ReducedInequality, MMASolver
 
 
-pvd_frequency = 5
-hdf5_frequency = 0
+pvd_frequency = 1000
+hdf5_frequency = 1
 
 # --- 0. Parameters Initialisation ---
 # 0.1 Mesh and scales
@@ -396,6 +396,8 @@ Klimit = fd.assemble(fd.Constant(1.0) * fd.dx(mesh)) * 2.0
 Kcontrol = fda.Control(K)
 Khat = fda.ReducedFunctional(K, c)
 
+global_i_record = []
+
 # 6.4 Continuation loop
 for i in range(STAGES):
     ramp_p_thermal.interpolate(fd.Constant(ramp_p_thermal_values[i]))
@@ -415,3 +417,7 @@ for i in range(STAGES):
     rho_opt = results["control"]
     with stop_annotating():
         rho.assign(rho_opt)
+
+    global_i_record.append(global_i)
+
+print("Global i", global_i_record)
