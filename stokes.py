@@ -65,7 +65,7 @@ print("Prandtl number: ", Prandtl_number)
 
 
 # 0.3 Optimisation Parameters
-STAGES = 5
+STAGES = 10
 iter_per_stage = 20
 total_iterations = STAGES * iter_per_stage
 
@@ -387,7 +387,7 @@ c = fda.Control(rho)
 Jhat = fda.ReducedFunctional(
     J,
     c,
-    derivative_cb_post=output,
+    # derivative_cb_post=output,
 )
 
 # 6.3 Volume Constraint definition
@@ -397,6 +397,7 @@ Kcontrol = fda.Control(K)
 Khat = fda.ReducedFunctional(K, c)
 
 global_i_record = []
+loops = []
 
 # 6.4 Continuation loop
 for i in range(STAGES):
@@ -414,6 +415,11 @@ for i in range(STAGES):
     solver = MMASolver(problem, parameters=parameters_mma)
     results = solver.solve()
 
+    loops.append(results["loop"])
+    print("Loop index", results["loop"])
+
+    output(None, None, None)
+
     rho_opt = results["control"]
     with stop_annotating():
         rho.assign(rho_opt)
@@ -421,3 +427,4 @@ for i in range(STAGES):
     global_i_record.append(global_i)
 
 print("Global i", global_i_record)
+print("Loops", loops)

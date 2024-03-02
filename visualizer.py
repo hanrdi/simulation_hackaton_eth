@@ -9,9 +9,10 @@ import numpy as np
 
 import os
 
-
+seed = 0
 # data_path = "./data/output_seed1/"
-data_path = "./output_seed0/"
+data_path = "./output_seed" + str(seed) + "/"
+format_output_path = "./formatted_data" + str(seed) + "/"
 
 
 def plot_mesh(mesh):
@@ -39,8 +40,6 @@ def plot_vom(function, mesh):
     X, Y = np.meshgrid(x, y)
     XY = np.array([X.flatten(), Y.flatten()]).T
 
-    print(XY.shape)
-
     mesh_eval = VertexOnlyMesh(mesh, XY)
     p0dg = FunctionSpace(mesh_eval, "DG", 0)
 
@@ -60,7 +59,6 @@ def plot_tria(function, mesh):
     function_plotter = FunctionPlotter(mesh, 1)
     triangulation = function_plotter.triangulation
     f_at_points = function_plotter(function)
-    print(f_at_points.shape)
 
     tripc = plt.tripcolor(triangulation, f_at_points)
 
@@ -104,10 +102,16 @@ def main():
     for file_name in filenames:
         num = int(file_name[len(data_path) + len("results-") :].split(".")[0])
 
-        if num > 20:
-            break
+        # if num < 22:
+        #     continue
+
+        # if num > 22:
+        #     break
+
         # if num % 20 != 19:
         #     continue
+
+        print(file_name)
 
         with CheckpointFile(file_name, "r") as afile:
             mesh = afile.load_mesh()
@@ -133,16 +137,16 @@ def main():
             for f in function_names:
                 func = afile.load_function(mesh, f)
                 x, y = eval_function(func)
-                # filename = (
-                #     "./formatted_data/" + file_name[len(data_path) :] + "_" + f + ".out"
-                # )
-                # print("Saving", filename)
-                # np.savetxt(filename, y)
+                filename = (
+                    format_output_path + file_name[len(data_path) :] + "_" + f + ".out"
+                )
+                print("Saving", filename)
+                np.savetxt(filename, y)
 
                 plot(y, title=f)
-                # plt.savefig(
-                #     "./formatted_data/" + file_name[len(data_path) :] + "_" + f + ".png"
-                # )
+                plt.savefig(
+                    format_output_path + file_name[len(data_path) :] + "_" + f + ".png"
+                )
 
             for cf_name, cf in composite_functions.items():
                 for sf_name, subfunc in cf.items():
@@ -151,24 +155,24 @@ def main():
                     func = afile.load_function(mesh, cf_name).sub(subfunc)
                     x, y = eval_function(func)
 
-                    # filename = (
-                    #     "./formatted_data/"
-                    #     + file_name[len(data_path) :]
-                    #     + "_"
-                    #     + sf_name
-                    #     + ".out"
-                    # )
-                    # print("Saving", filename)
-                    # np.savetxt(filename, y)
+                    filename = (
+                        format_output_path
+                        + file_name[len(data_path) :]
+                        + "_"
+                        + sf_name
+                        + ".out"
+                    )
+                    print("Saving", filename)
+                    np.savetxt(filename, y)
 
                     plot(y, title=sf_name)
-                    # plt.savefig(
-                    #     "./formatted_data/"
-                    #     + file_name[len(data_path) :]
-                    #     + "_"
-                    #     + sf_name
-                    #     + ".png"
-                    # )
+                    plt.savefig(
+                        format_output_path
+                        + file_name[len(data_path) :]
+                        + "_"
+                        + sf_name
+                        + ".png"
+                    )
 
 
 if __name__ == "__main__":
