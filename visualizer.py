@@ -128,17 +128,21 @@ def main():
                 fig.colorbar(cmesh)
 
                 plt.title(title)
-                plt.show()
+                # plt.show()
 
             for f in function_names:
                 func = afile.load_function(mesh, f)
                 x, y = eval_function(func)
-                filename = (
-                    "./formatted_data/" + file_name[len(data_path) :] + "_" + f + ".out"
-                )
-                print("Saving", filename)
-                np.savetxt(filename, y)
-                # plot(y, title=f)
+                # filename = (
+                #     "./formatted_data/" + file_name[len(data_path) :] + "_" + f + ".out"
+                # )
+                # print("Saving", filename)
+                # np.savetxt(filename, y)
+
+                plot(y, title=f)
+                # plt.savefig(
+                #     "./formatted_data/" + file_name[len(data_path) :] + "_" + f + ".png"
+                # )
 
             for cf_name, cf in composite_functions.items():
                 for sf_name, subfunc in cf.items():
@@ -146,16 +150,25 @@ def main():
                     # print("sf", subfunc)
                     func = afile.load_function(mesh, cf_name).sub(subfunc)
                     x, y = eval_function(func)
-                    # plot(y, title=sf_name)
-                    filename = (
-                        "./formatted_data/"
-                        + file_name[len(data_path) :]
-                        + "_"
-                        + sf_name
-                        + ".out"
-                    )
-                    print("Saving", filename)
-                    np.savetxt(filename, y)
+
+                    # filename = (
+                    #     "./formatted_data/"
+                    #     + file_name[len(data_path) :]
+                    #     + "_"
+                    #     + sf_name
+                    #     + ".out"
+                    # )
+                    # print("Saving", filename)
+                    # np.savetxt(filename, y)
+
+                    plot(y, title=sf_name)
+                    # plt.savefig(
+                    #     "./formatted_data/"
+                    #     + file_name[len(data_path) :]
+                    #     + "_"
+                    #     + sf_name
+                    #     + ".png"
+                    # )
 
 
 if __name__ == "__main__":
