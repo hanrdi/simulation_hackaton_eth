@@ -16,6 +16,9 @@ from helpers import (
     ramp_interpolation,
     wall_drag_term,
 )
+
+from visualizer import eval_function, plot_approx
+
 from pyMMAopt import ReducedInequality, MMASolver
 
 
@@ -155,6 +158,29 @@ with stop_annotating():
 kdtree = KDTree(np.column_stack((power_map_grid[1].ravel(), power_map_grid[0].ravel())))
 power_map_f.dat.data[:] = power_map_data.ravel()[kdtree.query(xy.dat.data_ro)[1]]
 # TODO: save powermap function term as a field (h5 + pvd)
+
+
+def save_powermap(num_x=100, num_y=100):
+    x, y = eval_function(power_map_f)
+
+    def plot(out, title=""):
+        fig, axes = plt.subplots()
+        cmesh = plt.pcolormesh(out, cmap="inferno")
+        axes.set_aspect("equal")
+        fig.colorbar(cmesh)
+
+        plt.title(title)
+        # plt.show()
+
+    format_output_path = "./formatted_data" + str(sys.argv[1]) + "/powermap"
+    np.savetxt(format_output_path + ".out", y)
+
+    plot(y, title="powermap")
+    plt.savefig(format_output_path + ".png")
+
+
+save_powermap()
+
 
 tripcolor(power_map_f)
 plt.savefig("power_map.png")
@@ -320,6 +346,7 @@ t_total_viz = fd.Function(T)
 t_total_viz.sub(0).rename("channel_temperature")
 t_total_viz.sub(1).rename("substrate_temperature")
 
+
 up_node = fda.Control(up)
 up_viz = fd.Function(UP)
 up_viz.sub(0).rename("velocity")
@@ -332,6 +359,10 @@ rho_viz.rename("rho")
 rhof_node = fda.Control(rhof)
 rhof_viz = fd.Function(RHOF)
 rhof_viz.rename("rhof")
+
+# brink_node = fda.Control(brinkman)
+# brink_viz = fd.Function(BRINKMAN)
+# brink_viz.rename("brinkman")
 
 global_i = 0
 
@@ -350,6 +381,8 @@ def output(x, y, z):
 
         rho_viz.assign(rho_node.tape_value())
         rhof_viz.assign(rhof_node.tape_value())
+
+        # brink_viz.assign(brinkman_node.tape_value())
 
         pvd_output_file.write(
             up_viz.sub(0),
@@ -372,8 +405,28 @@ def output(x, y, z):
             save_file.save_function(rhof_node.tape_value(), name="rhof")
             save_file.save_function(up_node.tape_value(), name="up")
             save_file.save_function(t_total_node.tape_value(), name="t_total")
+            # save_file.save_function(brinkman.tape_value(), name="brink")
 
     global_i += 1
+    return y
+
+
+def callback(x, y, z):
+    return
+    brinkman = (
+        (1.0 / Re)
+        * (
+            wall_drag_term(Ht=Ht, L=L)
+            + alpha(rhof, Ht=Ht, ramp_p=ramp_p_fluid, Htfactor=Htfactor, L=L)
+        )
+        * fd.inner(u, v)
+        * fd.dx
+    )
+    print("brinkman type", type(brinkman))
+    print("brinkman content", brinkman)
+    print("assemble brinkman type", type(fd.assemble(brinkman)))
+    print(brinkman(np.array([0.5, 0.5])))
+
     return y
 
 
@@ -387,7 +440,7 @@ c = fda.Control(rho)
 Jhat = fda.ReducedFunctional(
     J,
     c,
-    # derivative_cb_post=output,
+    derivative_cb_post=callback,
 )
 
 # 6.3 Volume Constraint definition
