@@ -3,4 +3,4 @@ venv/
 output/
 __pycache__/
 output_seed*
-formatted_data/*
+# formatted_data/*

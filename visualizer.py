@@ -104,6 +104,8 @@ def main():
     for file_name in filenames:
         num = int(file_name[len(data_path) + len("results-") :].split(".")[0])
 
+        if num > 20:
+            break
         # if num % 20 != 19:
         #     continue
 
