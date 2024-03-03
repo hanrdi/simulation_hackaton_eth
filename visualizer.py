@@ -9,7 +9,7 @@ import numpy as np
 
 import os
 
-seed = 1
+seed = 99
 # data_path = "./data/output_seed1/"
 data_path = "./output_seed" + str(seed) + "/"
 format_output_path = "./formatted_data" + str(seed) + "/"

@@ -67,7 +67,7 @@ def mesh_size(mesh: fd.Mesh, mode="max"):
     return size
 
 
-def wall_drag_term(L: fd.Constant, Ht: fd.Constant):
+def wall_drag_term(L: fd.Constant, Ht: fd.Constant) -> fd.Constant:
     """Wall drag term for the non-dim problem
 
     Args:
