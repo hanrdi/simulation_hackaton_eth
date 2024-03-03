@@ -68,7 +68,7 @@ print("Prandtl number: ", Prandtl_number)
 
 
 # 0.3 Optimisation Parameters
-STAGES = 10
+STAGES = 30
 iter_per_stage = 20
 total_iterations = STAGES * iter_per_stage
 
@@ -195,7 +195,21 @@ RHOF = fd.FunctionSpace(mesh, "CG", 1)
 
 rho = fd.Function(RHO, name="Volume Fraction")
 with stop_annotating():
-    rho.interpolate(fd.Constant(initial_rho_value))
+    x, y = fd.SpatialCoordinate(mesh)
+
+    def gaussian(x, mean=0.5, stddev=0.5):
+        # 1 / (stddev * fd.sqrt(2 * fd.pi)) *
+        return fd.exp(-0.5 * ((x - mean) / stddev) ** 2)
+
+    def circle(x, y, c_x=0.5, c_y=0.5):
+        return 1 - (x - c_x) ** 2 - (y - c_y) ** 2
+
+    def normalize(x):
+        t = x**2
+        return t
+
+    rho.interpolate(normalize(fd.sin(y * 100) * gaussian(y) * circle(x, y)))
+    # rho.interpolate(fd.Constant(initial_rho_value))
 
 rhof = fd.Function(RHOF, name="Filtered Volume Fraction")
 rhof_test = fd.TestFunction(RHOF)
@@ -412,7 +426,7 @@ def output(x, y, z):
 
 
 def callback(x, y, z):
-    return
+    return y
     brinkman = (
         (1.0 / Re)
         * (
@@ -421,11 +435,14 @@ def callback(x, y, z):
         )
         * fd.inner(u, v)
         * fd.dx
+        # * fd.inner(u, v)
+        # * fd.dx
     )
     print("brinkman type", type(brinkman))
     print("brinkman content", brinkman)
-    print("assemble brinkman type", type(fd.assemble(brinkman)))
-    print(brinkman(np.array([0.5, 0.5])))
+    brinkman = fd.assemble(brinkman * rhof_test)
+    print("assemble brinkman type", type(brinkman))
+    print(brinkman.at(np.array([0.5, 0.5])))
 
     return y
 
