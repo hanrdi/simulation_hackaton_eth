@@ -83,6 +83,7 @@ class BasePinn:
         num_interior_samples=512,
         device="cuda",
         seed=0,
+        regularization_param=0.1
     ):
         self.num_boundary_samples = num_boundary_samples
         self.num_interior_samples = num_interior_samples
@@ -95,8 +96,8 @@ class BasePinn:
             input_dimension=self.domain.shape[0],
             output_dimension=num_outputs,
             n_hidden_layers=5,
-            neurons=512,
-            regularization_param=0.01,
+            neurons=256,
+            regularization_param=regularization_param,
             regularization_exp=2.0,
             retrain_seed=seed,
         ).to(self.device)
@@ -106,7 +107,7 @@ class BasePinn:
         )
 
         # Weight of boundary terms
-        self.lambda_u = 10000000
+        self.lambda_u = 10
 
         self.cached_boundary = None
         self.cached_interior_points = self.sample_interior_points(use_cached=False)
@@ -115,9 +116,15 @@ class BasePinn:
 
         self.t_0 = 293.15  # Inflow Fluid Temperature
 
+        self.p_0 = 1.0 # inflow pressure
+        self.p_L = 0.0 # outflow pressure
+
+    
+
         self.rho_l = 998  # Density Fluid
 
         self.C_f = 4180  # Heat capacity fluid
+        self.v_f = 1.004e-3
 
         self.k_t = 0.598  # Thermal conductivity Fluid
         self.k_b = 149  # Thermal conductivity Solid
@@ -134,6 +141,32 @@ class BasePinn:
         self.L = 0.001  # m
         self.U = np.sqrt(applied_pressure / self.rho_l)  # m/s
 
+        self.nu = self.v_f / self.rho_l
+
+        self.Re = self.L * self.U / self.nu
+        
+        self.q_k = 1 #this change in each optimization steps
+        self.alpha_f = 0
+        self.alpha_s = 5*self.L**2/(2*self.H_t**2)
+
+    def eval(self, points):
+
+        # Temp PINN
+        if self.num_outputs == 2:
+            mean = torch.tensor([293.2327663042587, 293.1548959834691], device=self.device)
+            std = torch.tensor(
+                [0.05894596474036041, 0.0043651020561740125], device=self.device
+            )
+
+        # Flow PINN
+        if self.num_outputs == 3:
+            mean = torch.tensor([0.5535466316835341, 6.359693982990098, 6.359693982990098], device=self.device)
+            std = torch.tensor(
+                [0.2972179586141333, 4.127014962188644, 4.127014962188644], device=self.device
+            )
+
+        return self.neural_network(points) * std + mean
+
     # Converts point in [0, 1] reference domain to true domain
     def _to_domain(self, points):
         # points dim = (batch_size, dim(domain))
@@ -148,6 +181,13 @@ class BasePinn:
     def sample_inflow_points(self, n_samples):
         samples = self.sample_domain(n_samples)
         samples[:, 0] = torch.full(samples[:, 0].shape, self.domain[0, 0])
+
+        return samples
+
+    # Sample outflow
+    def sample_outflow_points(self, n_samples):
+        samples = self.sample_domain(n_samples)
+        samples[:, 0] = torch.full(samples[:, 0].shape, self.domain[0, 1])
 
         return samples
 
@@ -169,9 +209,9 @@ class BasePinn:
 
         return self.sample_domain(self.num_interior_samples)
 
-    def sample_boundaries(self, use_cached=False):
+    def compute_boundary_error(self, use_cached=False):
         raise NotImplementedError(
-            "Implement the boundary sampling function for the base class"
+            "Implement the boundary error function for the base class"
         )
 
     # Compute error with some input/output pair e.g. on the boundaries or as part of supervised training
@@ -181,7 +221,7 @@ class BasePinn:
         )
 
     # Compute error according to the PDE of the interior
-    def compute_unsupervised_error(self, points, power_map, flow_field):
+    def compute_unsupervised_error(self, points, power_map=None, flow_field=None, rho=None):
         raise NotImplementedError(
             "Implement the unsupervised error function for the base class"
         )
@@ -195,14 +235,8 @@ class BasePinn:
         use_cached_data=True,
         power_map=None,
         flow_field=None,
+        rho=None
     ):
-        if data is None:
-            assert (
-                power_map is not None
-                and flow_field is not None
-                and "When not doing supervised training, supply the power map and flow field"
-            )
-
         history = list()
 
         # Loop over epochs
@@ -219,7 +253,7 @@ class BasePinn:
 
                     def closure():
                         optimizer.zero_grad()
-                        diff_loss = torch.max(
+                        diff_loss = 10e5 * torch.mean(
                             self.compute_supervised_error(
                                 points=data_input, values=data_output
                             )
@@ -248,43 +282,25 @@ class BasePinn:
                     optimizer.step(closure=closure)
             else:
 
-                boundary_training_data = DataLoader(
-                    TensorDataset(*self.sample_boundaries(use_cached_data)),
-                    batch_size=self.num_boundary_samples,
-                    shuffle=False,
-                )
-
                 interior_training_data = DataLoader(
                     TensorDataset(self.sample_interior_points(use_cached_data)),
                     batch_size=self.num_interior_samples,
                     shuffle=False,
                 )
 
-                for i, (
-                    (boundary_points, boundary_values),
-                    (interior_points,),
-                ) in enumerate(
-                    zip(
-                        boundary_training_data,
-                        interior_training_data,
-                    )
-                ):
-
+                for interior_points, in interior_training_data:
                     def closure():
                         optimizer.zero_grad()
                         loss_boundary = torch.mean(
-                            self.compute_supervised_error(
-                                points=boundary_points,
-                                values=boundary_values,
-                            )
-                            ** 2
+                            self.compute_boundary_error() ** 2
                         )
 
-                        loss_interior = 10e-10 * torch.mean(
+                        loss_interior = torch.mean(  # 10e-10
                             self.compute_unsupervised_error(
                                 points=interior_points,
                                 power_map=power_map,
                                 flow_field=flow_field,
+                                rho=rho
                             )
                             ** 2
                         )
@@ -302,7 +318,7 @@ class BasePinn:
                                 "Total loss: ",
                                 round(loss.item(), 4),
                                 "| Boundary Error: ",
-                                round(loss_boundary.item(), 4),
+                                round(self.lambda_u * loss_boundary.item(), 4),
                                 "| Interior Error: ",
                                 round(loss_interior.item(), 4),
                                 "| Regularization Error: ",
